@@ -1,14 +1,23 @@
 pipeline {
-    agent any
+    agent none
 
     stages {
-        stage('Build and test'){
+        stage('Checkout, build and test') {
             agent {
                 docker {
                     image 'node:alpine3.20'
                 }
             }
             stages {
+                stage('Checkout'){
+                    steps {
+                        git(
+                            url: 'https://github.com/lukasz-kam/cicd-task-3',
+                            branch: "${params.ENVIRONMENT}"
+                        )
+                        stash name: 'source-code', includes: '**/*'
+                    }
+                }
                 stage('Build'){
                     steps {
                         script {
@@ -29,7 +38,7 @@ pipeline {
                 }
             }
         }
-        stage('Docker build, deploy and cleanup '){
+        stage('Docker build, deploy and cleanup'){
             agent {
                 docker {
                     image 'docker:latest'
@@ -38,22 +47,22 @@ pipeline {
             }
             environment {
                 HOME = "${env.WORKSPACE}"
-                PORT = "${env.BRANCH_NAME == 'main' ? '3000' : env.BRANCH_NAME == 'dev' ? '3001' : '5000'}"
+                PORT = "${params.ENVIRONMENT == 'main' ? '3000' : (params.ENVIRONMENT == 'dev' ? '3001' : '5000')}"
             }
-            stages{
+            stages {
                 stage('Build'){
                     steps {
                         script {
-                            sh "docker build -t node${env.BRANCH_NAME}:v1.0 ."
+                            unstash 'source-code'
+                            sh "docker build -t node${params.ENVIRONMENT}:${params.IMAGE_TAG} ."
                         }
                     }
                 }
-
                 stage('Deploy'){
                     steps {
                         script {
-                            sh "docker ps -aq --filter label=env=${env.BRANCH_NAME} | xargs -r docker rm -f"
-                            sh "docker run -d --label env=${env.BRANCH_NAME} --expose ${PORT} -p ${PORT}:3000 node${env.BRANCH_NAME}:v1.0"
+                            sh "docker ps -aq --filter label=env=${params.ENVIRONMENT} | xargs -r docker rm -f"
+                            sh "docker run -d --label env=${params.ENVIRONMENT} --expose ${PORT} -p ${PORT}:3000 node${params.ENVIRONMENT}:${params.IMAGE_TAG}"
                         }
                     }
                 }
