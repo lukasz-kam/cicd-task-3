@@ -40,21 +40,30 @@ pipeline {
         stage('Docker build, deploy and cleanup'){
             agent {
                 docker {
-                    image 'docker:latest'
+                    image 'lucascx/trivy-docker:v1.0'
                     args '-v /var/run/docker.sock:/var/run/docker.sock --user 1000:999'
                 }
             }
             environment {
                 HOME = "${env.WORKSPACE}"
                 PORT = "${params.ENVIRONMENT == 'main' ? '3000' : (params.ENVIRONMENT == 'dev' ? '3001' : '5000')}"
-                DOCKER_USER = "lucascx"
-                IMAGE_NAME ="node${params.ENVIRONMENT}:${params.IMAGE_TAG}"
+                DOCKER_USER = 'lucascx'
+                IMAGE_NAME = "node${params.ENVIRONMENT}:${params.IMAGE_TAG}"
+                TRIVY_OUTPUT_FILE = "trivy_result-${env.BUILD_NUMBER}"
             }
             stages {
                 stage('Build'){
                     steps {
                         script {
                             sh "docker build -t $IMAGE_NAME ."
+                        }
+                    }
+                }
+                stage('Trivy scan'){
+                    steps {
+                        script {
+                            sh "trivy image --output $TRIVY_OUTPUT_FILE $IMAGE_NAME"
+                            archiveArtifacts artifacts: "${TRIVY_OUTPUT_FILE}", allowEmptyArchive: true
                         }
                     }
                 }
