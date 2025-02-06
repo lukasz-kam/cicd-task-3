@@ -47,12 +47,24 @@ pipeline {
             environment {
                 HOME = "${env.WORKSPACE}"
                 PORT = "${params.ENVIRONMENT == 'main' ? '3000' : (params.ENVIRONMENT == 'dev' ? '3001' : '5000')}"
+                DOCKER_USER = "lucascx"
+                IMAGE_NAME ="node${params.ENVIRONMENT}:${params.IMAGE_TAG}"
             }
             stages {
                 stage('Build'){
                     steps {
                         script {
-                            sh "docker build -t node${params.ENVIRONMENT}:${params.IMAGE_TAG} ."
+                            sh "docker build -t $IMAGE_NAME ."
+                        }
+                    }
+                }
+                stage('Push to dockerhub'){
+                    steps {
+                        script {
+                            sh "docker tag $IMAGE_NAME $DOCKER_USER/$IMAGE_NAME"
+                            withDockerRegistry([credentialsId: 'docker-lucascx', url: '']) {
+                                sh "docker push $DOCKER_USER/$IMAGE_NAME"
+                            }
                         }
                     }
                 }
@@ -60,7 +72,7 @@ pipeline {
                     steps {
                         script {
                             sh "docker ps -aq --filter label=env=${params.ENVIRONMENT} | xargs -r docker rm -f"
-                            sh "docker run -d --label env=${params.ENVIRONMENT} --expose ${PORT} -p ${PORT}:3000 node${params.ENVIRONMENT}:${params.IMAGE_TAG}"
+                            sh "docker run -d --label env=${params.ENVIRONMENT} --expose ${PORT} -p ${PORT}:3000 $IMAGE_NAME"
                         }
                     }
                 }
