@@ -15,7 +15,6 @@ pipeline {
                             url: 'https://github.com/lukasz-kam/cicd-task-3',
                             branch: "${params.ENVIRONMENT}"
                         )
-                        stash name: 'source-code', includes: '**/*'
                     }
                 }
                 stage('Build'){
@@ -53,7 +52,6 @@ pipeline {
                 stage('Build'){
                     steps {
                         script {
-                            unstash 'source-code'
                             sh "docker build -t node${params.ENVIRONMENT}:${params.IMAGE_TAG} ."
                         }
                     }
