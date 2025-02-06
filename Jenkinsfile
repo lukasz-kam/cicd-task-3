@@ -9,8 +9,10 @@ pipeline {
             agent {
                 docker {
                     image 'node:alpine3.20'
+                    customWorkspace "/home/vagrant/workspace/${env.JOB_NAME}-${env.BRANCH_NAME}"
                 }
             }
+
             steps {
                 script {
                     echo "Build started..."
@@ -22,6 +24,7 @@ pipeline {
         stage('Test'){
             agent {
                 docker {
+                    customWorkspace "/home/vagrant/workspace/${env.JOB_NAME}-${env.BRANCH_NAME}"
                     image 'node:alpine3.20'
                 }
             }
@@ -38,6 +41,7 @@ pipeline {
                 docker {
                     image 'docker:latest'
                     args '-v /var/run/docker.sock:/var/run/docker.sock --user 1000:999'
+                    customWorkspace "/home/vagrant/workspace/${env.JOB_NAME}-${env.BRANCH_NAME}"
                 }
             }
             environment {
@@ -54,6 +58,7 @@ pipeline {
                 docker {
                     image 'docker:latest'
                     args '-v /var/run/docker.sock:/var/run/docker.sock --user 1000:999'
+                    customWorkspace "/home/vagrant/workspace/${env.JOB_NAME}-${env.BRANCH_NAME}"
                 }
             }
             environment {
@@ -71,6 +76,7 @@ pipeline {
                 docker {
                     image 'docker:latest'
                     args '-v /var/run/docker.sock:/var/run/docker.sock --user 1000:999'
+                    customWorkspace "/home/vagrant/workspace/${env.JOB_NAME}-${env.BRANCH_NAME}"
                 }
             }
             steps {
