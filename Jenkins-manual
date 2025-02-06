@@ -1,6 +1,11 @@
 pipeline {
     agent none
 
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['main', 'dev'], description: 'Select the environment')
+        string(name: 'IMAGE_TAG', defaultValue: 'v1.0', description: 'Enter the tag for the docker image')
+    }
+
     stages {
         stage('Checkout, build and test') {
             agent {
@@ -9,14 +14,6 @@ pipeline {
                 }
             }
             stages {
-                stage('Checkout'){
-                    steps {
-                        git(
-                            url: 'https://github.com/lukasz-kam/cicd-task-3',
-                            branch: "${params.ENVIRONMENT}"
-                        )
-                    }
-                }
                 stage('Build'){
                     steps {
                         script {
