@@ -1,22 +1,23 @@
 pipeline {
     agent none
 
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['main', 'dev'], description: 'Select the environment')
+        string(name: 'IMAGE_TAG', defaultValue: 'v1.0', description: 'Enter the tag for the docker image')
+    }
+    environment {
+        TRIVY_OUTPUT_FILE = "trivy_result-${env.BUILD_NUMBER}"
+        HADOLINT_OUTPUT_FILE = "hadolint_result-${env.BUILD_NUMBER}"
+    }
+
     stages {
-        stage('Checkout, build and test') {
+        stage('Build and test') {
             agent {
                 docker {
                     image 'node:alpine3.20'
                 }
             }
             stages {
-                stage('Checkout'){
-                    steps {
-                        git(
-                            url: 'https://github.com/lukasz-kam/cicd-task-3',
-                            branch: "${params.ENVIRONMENT}"
-                        )
-                    }
-                }
                 stage('Build'){
                     steps {
                         script {
@@ -37,22 +38,50 @@ pipeline {
                 }
             }
         }
+        stage('Dockerfile lint'){
+            agent {
+                docker {
+                    image 'hadolint/hadolint:latest-alpine'
+                }
+            }
+            steps {
+                sh "hadolint -f json Dockerfile > ${HADOLINT_OUTPUT_FILE}"
+            }
+            post {
+                failure {
+                    sh "cat ${HADOLINT_OUTPUT_FILE}"
+                    archiveArtifacts artifacts: "${HADOLINT_OUTPUT_FILE}", fingerprint: true
+                }
+            }
+        }
         stage('Docker build, deploy and cleanup'){
             agent {
                 docker {
-                    image 'docker:latest'
+                    image 'lucascx/trivy-docker:v1.0'
                     args '-v /var/run/docker.sock:/var/run/docker.sock --user 1000:999'
                 }
             }
             environment {
                 HOME = "${env.WORKSPACE}"
                 PORT = "${params.ENVIRONMENT == 'main' ? '3000' : (params.ENVIRONMENT == 'dev' ? '3001' : '5000')}"
+                DOCKER_USER = 'lucascx'
+                IMAGE_NAME = "node${params.ENVIRONMENT}:${params.IMAGE_TAG}"
             }
             stages {
                 stage('Build'){
                     steps {
                         script {
-                            sh "docker build -t node${params.ENVIRONMENT}:${params.IMAGE_TAG} ."
+                            sh "docker build -t $IMAGE_NAME ."
+                        }
+                    }
+                }
+                stage('Trivy scan'){
+                    steps {
+                        script {
+                            def vulnerabilities = sh(script: "trivy image --exit-code 0 --severity HIGH,MEDIUM,LOW --no-progress ${IMAGE_NAME}", returnStdout: true).trim()
+                            sh """echo "Vulnerability Report:\n${vulnerabilities}" | tee ${TRIVY_OUTPUT_FILE}"""
+                            archiveArtifacts artifacts: "${TRIVY_OUTPUT_FILE}", allowEmptyArchive: true
+
                         }
                     }
                 }
@@ -60,7 +89,7 @@ pipeline {
                     steps {
                         script {
                             sh "docker ps -aq --filter label=env=${params.ENVIRONMENT} | xargs -r docker rm -f"
-                            sh "docker run -d --label env=${params.ENVIRONMENT} --expose ${PORT} -p ${PORT}:3000 node${params.ENVIRONMENT}:${params.IMAGE_TAG}"
+                            sh "docker run -d --label env=${params.ENVIRONMENT} --expose ${PORT} -p ${PORT}:3000 $IMAGE_NAME"
                         }
                     }
                 }

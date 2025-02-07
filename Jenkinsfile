@@ -1,6 +1,15 @@
 pipeline {
     agent any
 
+    environment {
+
+        PORT = "${env.BRANCH_NAME == 'main' ? '3000' : env.BRANCH_NAME == 'dev' ? '3001' : '5000'}"
+        TRIVY_OUTPUT_FILE = "trivy_result-${env.BUILD_NUMBER}"
+        HADOLINT_OUTPUT_FILE = "hadolint_result-${env.BUILD_NUMBER}"
+        IMAGE_NAME = "node${env.BRANCH_NAME}:v1.0"
+        DOCKER_USER = 'lucascx'
+    }
+
     stages {
         stage('Build and test'){
             agent {
@@ -29,42 +38,72 @@ pipeline {
                 }
             }
         }
-        stage('Docker build, deploy and cleanup '){
+        stage('Dockerfile lint'){
             agent {
                 docker {
-                    image 'docker:latest'
+                    image 'hadolint/hadolint:latest-alpine'
+                }
+            }
+            steps {
+                sh "hadolint -f json Dockerfile > ${HADOLINT_OUTPUT_FILE}"
+            }
+            post {
+                failure {
+                    sh "cat ${HADOLINT_OUTPUT_FILE}"
+                    archiveArtifacts artifacts: "${HADOLINT_OUTPUT_FILE}", fingerprint: true
+                }
+            }
+        }
+        stage('Docker build and push'){
+            agent {
+                docker {
+                    image 'lucascx/trivy-docker:v1.0'
                     args '-v /var/run/docker.sock:/var/run/docker.sock --user 1000:999'
                 }
             }
             environment {
                 HOME = "${env.WORKSPACE}"
-                PORT = "${env.BRANCH_NAME == 'main' ? '3000' : env.BRANCH_NAME == 'dev' ? '3001' : '5000'}"
             }
             stages{
                 stage('Build'){
                     steps {
                         script {
-                            sh "docker build -t node${env.BRANCH_NAME}:v1.0 ."
+                            sh "docker build -t ${IMAGE_NAME} ."
                         }
                     }
                 }
-
-                stage('Deploy'){
+                stage('Trivy scan'){
                     steps {
                         script {
-                            sh "docker ps -aq --filter label=env=${env.BRANCH_NAME} | xargs -r docker rm -f"
-                            sh "docker run -d --label env=${env.BRANCH_NAME} --expose ${PORT} -p ${PORT}:3000 node${env.BRANCH_NAME}:v1.0"
+                            sh "trivy image --output ${TRIVY_OUTPUT_FILE} ${IMAGE_NAME}"
+                            archiveArtifacts artifacts: "${TRIVY_OUTPUT_FILE}", allowEmptyArchive: true
                         }
                     }
                 }
-                stage('Cleanup'){
+                stage('Push to dockerhub'){
                     steps {
                         script {
-                            sh "docker image prune -f 2> /dev/null"
-                            sh "docker volume prune -f 2> /dev/null"
+                            sh "docker tag $IMAGE_NAME $DOCKER_USER/$IMAGE_NAME"
+                            withDockerRegistry([credentialsId: 'docker-lucascx', url: '']) {
+                                sh "docker push $DOCKER_USER/$IMAGE_NAME"
+                            }
                         }
                     }
                 }
+            }
+        }
+    }
+    post {
+        success {
+            script {
+                def jobName = "Deploy_to_${env.BRANCH_NAME}"
+                build job: jobName,
+                    parameters: [
+                        string(name: 'PORT', value: env.PORT),
+                        string(name: 'ENVIRONMENT', value: env.BRANCH_NAME),
+                        string(name: 'IMAGE_NAME', value: "$DOCKER_USER/$IMAGE_NAME")
+                    ],
+                    wait: false
             }
         }
     }

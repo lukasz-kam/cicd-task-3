@@ -1,0 +1,37 @@
+pipeline {
+    agent none
+
+    stages {
+        stage('Docker build and deploy'){
+            agent {
+                docker {
+                    image 'docker:27.5.1'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock --user 1000:999'
+                }
+            }
+            environment {
+                HOME = "${env.WORKSPACE}"
+                PORT = "${params.PORT}"
+                ENVIRONMENT = "${params.ENVIRONMENT}"
+                IMAGE_NAME = "${params.IMAGE_NAME}"
+            }
+            stages {
+                stage('Pull'){
+                    steps {
+                        script {
+                            sh "docker pull ${IMAGE_NAME}"
+                        }
+                    }
+                }
+                stage('Deploy'){
+                    steps {
+                        script {
+                            sh "docker ps -aq --filter label=env=${ENVIRONMENT} | xargs -r docker rm -f"
+                            sh "docker run -d --label env=${ENVIRONMENT} --expose ${PORT} -p ${PORT}:3000 ${IMAGE_NAME}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
