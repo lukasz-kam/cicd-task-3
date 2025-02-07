@@ -34,6 +34,16 @@ pipeline {
                 }
             }
         }
+        stage('Dockerfile lint'){
+            agent {
+                docker {
+                    image 'hadolint/hadolint:latest-alpine'
+                }
+            }
+            steps {
+                sh 'hadolint Dockerfile'
+            }
+        }
         stage('Docker build, deploy and cleanup'){
             agent {
                 docker {
