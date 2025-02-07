@@ -11,7 +11,7 @@ pipeline {
     }
 
     stages {
-        stage('Checkout, build and test') {
+        stage('Build and test') {
             agent {
                 docker {
                     image 'node:alpine3.20'
@@ -78,18 +78,10 @@ pipeline {
                 stage('Trivy scan'){
                     steps {
                         script {
-                            sh "trivy image --output ${TRIVY_OUTPUT_FILE} ${IMAGE_NAME}"
+                            def vulnerabilities = sh(script: "trivy image --exit-code 0 --severity HIGH,MEDIUM,LOW --no-progress ${IMAGE_NAME}", returnStdout: true).trim()
+                            sh """echo "Vulnerability Report:\n${vulnerabilities}" | tee ${TRIVY_OUTPUT_FILE}"""
                             archiveArtifacts artifacts: "${TRIVY_OUTPUT_FILE}", allowEmptyArchive: true
-                        }
-                    }
-                }
-                stage('Push to dockerhub'){
-                    steps {
-                        script {
-                            sh "docker tag $IMAGE_NAME $DOCKER_USER/$IMAGE_NAME"
-                            withDockerRegistry([credentialsId: 'docker-lucascx', url: '']) {
-                                sh "docker push $DOCKER_USER/$IMAGE_NAME"
-                            }
+
                         }
                     }
                 }
