@@ -2,7 +2,7 @@ pipeline {
     agent none
 
     stages {
-        stage('Docker build and deploy'){
+        stage('Docker pull and deploy'){
             agent {
                 docker {
                     image 'docker:27.5.1'

@@ -6,8 +6,8 @@ pipeline {
         string(name: 'IMAGE_TAG', defaultValue: 'v1.0', description: 'Enter the tag for the docker image')
     }
     environment {
-        TRIVY_OUTPUT_FILE = "trivy_result-${env.BUILD_NUMBER}"
-        HADOLINT_OUTPUT_FILE = "hadolint_result-${env.BUILD_NUMBER}"
+        TRIVY_OUTPUT_FILE = "trivy_result-${params.ENVIRONMENT}-${env.BUILD_NUMBER}"
+        HADOLINT_OUTPUT_FILE = "hadolint_result-${params.ENVIRONMENT}-${env.BUILD_NUMBER}"
     }
 
     stages {
