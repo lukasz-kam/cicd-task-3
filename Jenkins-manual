@@ -5,6 +5,10 @@ pipeline {
         choice(name: 'ENVIRONMENT', choices: ['main', 'dev'], description: 'Select the environment')
         string(name: 'IMAGE_TAG', defaultValue: 'v1.0', description: 'Enter the tag for the docker image')
     }
+    environment {
+        TRIVY_OUTPUT_FILE = "trivy_result-${env.BUILD_NUMBER}"
+        HADOLINT_OUTPUT_FILE = "hadolint_result-${env.BUILD_NUMBER}"
+    }
 
     stages {
         stage('Checkout, build and test') {
@@ -41,7 +45,13 @@ pipeline {
                 }
             }
             steps {
-                sh 'hadolint Dockerfile'
+                sh "hadolint -f json Dockerfile > ${HADOLINT_OUTPUT_FILE}"
+            }
+            post {
+                failure {
+                    sh "cat ${HADOLINT_OUTPUT_FILE}"
+                    archiveArtifacts artifacts: "${HADOLINT_OUTPUT_FILE}", fingerprint: true
+                }
             }
         }
         stage('Docker build, deploy and cleanup'){
@@ -56,7 +66,6 @@ pipeline {
                 PORT = "${params.ENVIRONMENT == 'main' ? '3000' : (params.ENVIRONMENT == 'dev' ? '3001' : '5000')}"
                 DOCKER_USER = 'lucascx'
                 IMAGE_NAME = "node${params.ENVIRONMENT}:${params.IMAGE_TAG}"
-                TRIVY_OUTPUT_FILE = "trivy_result-${env.BUILD_NUMBER}"
             }
             stages {
                 stage('Build'){
@@ -69,7 +78,7 @@ pipeline {
                 stage('Trivy scan'){
                     steps {
                         script {
-                            sh "trivy image --output $TRIVY_OUTPUT_FILE $IMAGE_NAME"
+                            sh "trivy image --output ${TRIVY_OUTPUT_FILE} ${IMAGE_NAME}"
                             archiveArtifacts artifacts: "${TRIVY_OUTPUT_FILE}", allowEmptyArchive: true
                         }
                     }
