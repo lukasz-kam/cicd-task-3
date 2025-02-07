@@ -1,0 +1,7 @@
+FROM docker:27.5.1
+
+RUN curl -sL "https://github.com/aquasecurity/trivy/releases/download/v0.59.1/trivy_0.59.1_Linux-64bit.tar.gz" -o /tmp/trivy.tar.gz && \
+    tar -xvzf /tmp/trivy.tar.gz -C /tmp && \
+    mv /tmp/trivy /usr/local/bin/ && \
+    chmod +x /usr/local/bin/trivy && \
+    rm -rf /tmp/*
