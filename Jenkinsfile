@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-
         PORT = "${env.BRANCH_NAME == 'main' ? '3000' : env.BRANCH_NAME == 'dev' ? '3001' : '5000'}"
         TRIVY_OUTPUT_FILE = "trivy_result-${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
         HADOLINT_OUTPUT_FILE = "hadolint_result-${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
