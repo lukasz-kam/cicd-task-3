@@ -1,0 +1,12 @@
+@Library('my-shared-lib') _
+
+dockerPipeline(
+    buildImageName: "node${env.BRANCH_NAME}:v1.0",
+    dockerUser: 'lucascx',
+    dockerCredentials: 'docker-lucascx',
+    trivyOutputFile: "trivy_result-${env.BRANCH_NAME}-${env.BUILD_NUMBER}",
+    hadolintOutputFile: "hadolint_result-${env.BRANCH_NAME}-${env.BUILD_NUMBER}",
+    dockerAgent: 'hadolint/hadolint:latest-alpine',
+    dockerImageName: 'docker:27.5.1',
+    runTrivy: 'true'
+)
